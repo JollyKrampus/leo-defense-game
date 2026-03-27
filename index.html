@@ -1,0 +1,1928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leo's Elemental Defense</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #1a1a2e;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    user-select: none;
+    display: flex;
+}
+canvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    cursor: crosshair;
+}
+#ui-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 200px;
+    height: 100vh;
+    background: #16213e;
+    border-left: 3px solid #0f3460;
+    color: #e0e0e0;
+    font-size: 12px;
+    overflow-y: auto;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+}
+#ui-panel.hidden { display: none; }
+.panel-section {
+    padding: 8px;
+    border-bottom: 2px solid #0f3460;
+}
+.panel-title {
+    font-weight: bold;
+    font-size: 13px;
+    color: #e94560;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.creature-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    background: #1a1a2e;
+    border: 2px solid #0f3460;
+    border-radius: 4px;
+    color: #e0e0e0;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    transition: border-color 0.15s;
+}
+.creature-btn:hover { border-color: #e94560; }
+.creature-btn.selected { border-color: #e94560; background: #2a1a3e; }
+.creature-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+.creature-btn canvas { border-radius: 2px; }
+.creature-cost { margin-left: auto; color: #ffd700; font-weight: bold; }
+.info-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
+.info-label { color: #888; }
+.info-value { color: #fff; font-weight: bold; }
+.info-value.super { color: #4eff4e; }
+.info-value.weak { color: #ff4e4e; }
+.action-btn {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+    border: 2px solid;
+    border-radius: 4px;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: bold;
+    transition: background 0.15s;
+}
+.action-btn:hover { background: #2a2a4e; }
+.action-btn.evolve { border-color: #4eff4e; color: #4eff4e; }
+.action-btn.sell { border-color: #ff6b6b; color: #ff6b6b; }
+.action-btn.wave { border-color: #ffd700; color: #ffd700; }
+.action-btn.speed { border-color: #00bfff; color: #00bfff; }
+.action-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+.wave-info { text-align: center; padding: 4px; font-size: 13px; }
+.type-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: bold;
+    color: #fff;
+}
+.type-fire { background: #e94560; }
+.type-water { background: #1e90ff; }
+.type-earth { background: #8B6914; }
+.type-electric { background: #DAA520; }
+.type-ice { background: #00CED1; }
+#title-overlay, #gameover-overlay, #victory-overlay, #pause-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    background: rgba(10, 10, 30, 0.92);
+    color: #e0e0e0;
+    text-align: center;
+}
+.overlay-hidden { display: none !important; }
+.overlay-title {
+    font-size: 48px;
+    font-weight: bold;
+    color: #e94560;
+    text-shadow: 0 0 20px #e94560;
+    margin-bottom: 10px;
+}
+.overlay-subtitle {
+    font-size: 16px;
+    color: #aaa;
+    margin-bottom: 30px;
+    max-width: 500px;
+    line-height: 1.5;
+}
+.overlay-btn {
+    padding: 12px 40px;
+    font-size: 18px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 6px;
+    transition: background 0.15s, transform 0.1s;
+}
+.overlay-btn:hover { background: #ff6b8a; transform: scale(1.05); }
+.overlay-stats { font-size: 14px; color: #aaa; margin: 15px 0; line-height: 1.8; }
+.overlay-stats span { color: #ffd700; font-weight: bold; }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<div id="ui-panel" class="hidden">
+    <div class="panel-section">
+        <div class="panel-title">Creatures</div>
+        <div id="creature-buttons"></div>
+    </div>
+    <div class="panel-section" id="info-panel" style="display:none;">
+        <div class="panel-title">Selected</div>
+        <div id="info-content"></div>
+    </div>
+    <div class="panel-section">
+        <div class="panel-title">Wave</div>
+        <div id="wave-panel"></div>
+    </div>
+    <div class="panel-section">
+        <button class="action-btn speed" id="speed-btn" onclick="game.toggleSpeed()">Speed: 1x</button>
+        <button class="action-btn" style="border-color:#aaa;color:#aaa;margin-top:4px" onclick="game.togglePause()">Pause</button>
+    </div>
+</div>
+
+<div id="title-overlay">
+    <div class="overlay-title">Leo's Elemental Defense</div>
+    <div class="overlay-subtitle">
+        Summon elemental creatures to defend against waves of invaders!<br>
+        Evolve your creatures, exploit type weaknesses, and survive 30 waves!
+    </div>
+    <div style="margin-bottom:20px; color:#888; font-size:13px;">
+        Click to place creatures | Right-click to deselect | Click placed creatures to evolve/sell
+    </div>
+    <button class="overlay-btn" onclick="game.startGame()">Start Game</button>
+</div>
+
+<div id="gameover-overlay" class="overlay-hidden">
+    <div class="overlay-title" style="color:#ff4444;">Defeated!</div>
+    <div id="gameover-stats" class="overlay-stats"></div>
+    <button class="overlay-btn" onclick="game.restartGame()">Try Again</button>
+</div>
+
+<div id="victory-overlay" class="overlay-hidden">
+    <div class="overlay-title" style="color:#4eff4e;">Victory!</div>
+    <div class="overlay-subtitle">You defended against all 30 waves!</div>
+    <div id="victory-stats" class="overlay-stats"></div>
+    <button class="overlay-btn" style="background:#4eff4e;color:#1a1a2e;" onclick="game.restartGame()">Play Again</button>
+</div>
+
+<div id="pause-overlay" class="overlay-hidden">
+    <div class="overlay-title" style="font-size:36px;">Paused</div>
+    <button class="overlay-btn" onclick="game.togglePause()">Resume</button>
+    <button class="overlay-btn" style="background:#555;" onclick="game.restartGame()">Restart</button>
+</div>
+
+<script>
+// ===== SECTION 1: CONSTANTS & CONFIGURATION =====
+const CONFIG = {
+    GRID_SIZE: 40,
+    COLS: 25,
+    ROWS: 16,
+    LOGICAL_W: 1000,
+    LOGICAL_H: 640,
+    PANEL_W: 200,
+    FPS: 60,
+    STARTING_GOLD: 150,
+    STARTING_LIVES: 20,
+    SELL_REFUND: 0.6,
+    TOTAL_WAVES: 30,
+    BETWEEN_WAVE_TIME: 15,
+};
+
+const TYPE_COLORS = {
+    fire: { primary: '#e94560', secondary: '#ff8c42', dark: '#a82040', light: '#ffb347' },
+    water: { primary: '#1e90ff', secondary: '#00bfff', dark: '#0050a0', light: '#87cefa' },
+    earth: { primary: '#8B6914', secondary: '#c8a84e', dark: '#5a4510', light: '#dbc078' },
+    electric: { primary: '#ffd700', secondary: '#fff44f', dark: '#b8960f', light: '#fffacd' },
+    ice: { primary: '#00CED1', secondary: '#7fffd4', dark: '#008B8B', light: '#e0ffff' },
+    normal: { primary: '#66bb6a', secondary: '#a5d6a7', dark: '#388e3c', light: '#c8e6c9' },
+};
+
+const TYPE_EFFECTIVENESS = {
+    fire:     { normal: 1.0, fire: 0.75, water: 0.5, earth: 1.5, electric: 1.0, ice: 2.0 },
+    water:    { normal: 1.0, fire: 2.0, water: 0.75, earth: 0.5, electric: 1.0, ice: 0.75 },
+    earth:    { normal: 1.0, fire: 0.5, water: 1.5, earth: 0.75, electric: 2.0, ice: 1.0 },
+    electric: { normal: 1.0, fire: 1.0, water: 2.0, earth: 0.5, electric: 0.75, ice: 1.5 },
+    ice:      { normal: 1.0, fire: 0.5, water: 0.5, earth: 2.0, electric: 1.0, ice: 0.75 },
+};
+
+const CREATURE_DEFS = {
+    fire: {
+        name: ['Ember', 'Blazer', 'Phoenixar'],
+        cost: [50, 75, 150],
+        damage: [15, 35, 70],
+        range: [120, 140, 160],
+        attackSpeed: [1.2, 1.4, 1.6],
+        special: [null, { type: 'burn', chance: 0.15, dps: 5, duration: 3 }, { type: 'burn', chance: 0.30, dps: 10, duration: 3 }],
+    },
+    water: {
+        name: ['Splash', 'Torrent', 'Tidalon'],
+        cost: [50, 75, 150],
+        damage: [12, 28, 55],
+        range: [130, 150, 170],
+        attackSpeed: [1.0, 1.1, 1.2],
+        special: [
+            { type: 'slow', chance: 1, amount: 0.2, duration: 1.5 },
+            { type: 'slow', chance: 1, amount: 0.3, duration: 2 },
+            { type: 'slow', chance: 1, amount: 0.3, duration: 2, aoe: 40 },
+        ],
+    },
+    earth: {
+        name: ['Boulder', 'Craggor', 'Crystalon'],
+        cost: [60, 90, 175],
+        damage: [25, 55, 110],
+        range: [100, 110, 130],
+        attackSpeed: [0.7, 0.8, 0.9],
+        special: [null, { type: 'stun', chance: 0.10, duration: 0.5 }, { type: 'stun', chance: 0.20, duration: 0.8 }],
+    },
+    electric: {
+        name: ['Volt', 'Zaptor', 'Thundrak'],
+        cost: [55, 80, 160],
+        damage: [10, 22, 45],
+        range: [140, 160, 180],
+        attackSpeed: [1.8, 2.0, 2.2],
+        special: [null, { type: 'chain', targets: 1, dmgRatio: 0.5 }, { type: 'chain', targets: 2, dmgRatio: 0.5 }],
+    },
+    ice: {
+        name: ['Frost', 'Glacius', 'Cryodon'],
+        cost: [55, 80, 160],
+        damage: [8, 18, 35],
+        range: [150, 170, 190],
+        attackSpeed: [0.9, 1.0, 1.1],
+        special: [
+            { type: 'slow', chance: 1, amount: 0.4, duration: 2 },
+            { type: 'slow', chance: 1, amount: 0.5, duration: 2.5 },
+            { type: 'slow', chance: 1, amount: 0.5, duration: 2.5, freeze: { chance: 0.10, duration: 1.5 }},
+        ],
+    },
+};
+
+const ENEMY_DEFS = {
+    normal: { name: 'Slime', hp: 50, speed: 60, armor: 0, reward: 5, color: TYPE_COLORS.normal.primary },
+    fire: { name: 'Magma Bug', hp: 70, speed: 55, armor: 2, reward: 8, color: TYPE_COLORS.fire.primary, immune: 'burn' },
+    water: { name: 'Aqua Blob', hp: 60, speed: 65, armor: 0, reward: 7, color: TYPE_COLORS.water.primary, immune: 'slow' },
+    earth: { name: 'Rock Beetle', hp: 100, speed: 45, armor: 5, reward: 10, color: TYPE_COLORS.earth.primary },
+    electric: { name: 'Spark Fly', hp: 40, speed: 80, armor: 0, reward: 8, color: TYPE_COLORS.electric.primary, immune: 'stun' },
+    ice: { name: 'Frost Crawler', hp: 80, speed: 50, armor: 3, reward: 9, color: TYPE_COLORS.ice.primary, immune: 'freeze' },
+};
+
+const MAP_WAYPOINTS = [
+    { x: -1, y: 1 },
+    { x: 21, y: 1 },
+    { x: 21, y: 4 },
+    { x: 3, y: 4 },
+    { x: 3, y: 7 },
+    { x: 21, y: 7 },
+    { x: 21, y: 10 },
+    { x: 2, y: 10 },
+    { x: 2, y: 13 },
+    { x: 22, y: 13 },
+    { x: 22, y: 14 },
+    { x: 25, y: 14 },
+];
+
+// ===== SECTION 2: UTILITY FUNCTIONS =====
+function dist(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function randRange(min, max) { return min + Math.random() * (max - min); }
+
+function randInt(min, max) { return Math.floor(randRange(min, max + 1)); }
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function gridToPixel(gx, gy) {
+    return { x: gx * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2, y: gy * CONFIG.GRID_SIZE + CONFIG.GRID_SIZE / 2 };
+}
+
+function pixelToGrid(px, py) {
+    return { x: Math.floor(px / CONFIG.GRID_SIZE), y: Math.floor(py / CONFIG.GRID_SIZE) };
+}
+
+function buildPathCells(waypoints) {
+    const cells = new Set();
+    for (let i = 0; i < waypoints.length - 1; i++) {
+        const a = waypoints[i], b = waypoints[i + 1];
+        if (a.x === b.x) {
+            const minY = Math.min(a.y, b.y), maxY = Math.max(a.y, b.y);
+            for (let y = minY; y <= maxY; y++) cells.add(`${a.x},${y}`);
+        } else {
+            const minX = Math.min(a.x, b.x), maxX = Math.max(a.x, b.x);
+            for (let x = minX; x <= maxX; x++) cells.add(`${x},${a.y}`);
+        }
+    }
+    return cells;
+}
+
+function buildPixelWaypoints(waypoints) {
+    return waypoints.map(w => gridToPixel(w.x, w.y));
+}
+
+function getWaveEnemies(waveNum) {
+    const w = waveNum;
+    const enemies = [];
+    const hpMult = 1.0 + (w - 1) * 0.12;
+    const spdMult = 1.0 + (w - 1) * 0.008;
+    const rwdMult = 1.0 + (w - 1) * 0.05;
+    const spawnInterval = Math.max(0.5, 1.2 - w * 0.024);
+
+    const isBoss = w % 5 === 0;
+    const bossTypes = ['fire', 'water', 'earth', 'electric', 'ice', 'normal'];
+    const bossType = isBoss ? bossTypes[Math.min(Math.floor(w / 5) - 1, 5)] : null;
+
+    let types = ['normal'];
+    if (w >= 4) types.push('fire');
+    if (w >= 6) types.push('water');
+    if (w >= 8) types.push('earth');
+    if (w >= 11) types.push('electric');
+    if (w >= 11) types.push('ice');
+
+    let count;
+    if (w <= 3) count = 6 + w * 2;
+    else if (w <= 10) count = 10 + w;
+    else if (w <= 20) count = 15 + w;
+    else count = 20 + w;
+
+    if (isBoss) count = Math.max(6, count - 8);
+
+    for (let i = 0; i < count; i++) {
+        const type = types[i % types.length];
+        const def = ENEMY_DEFS[type];
+        enemies.push({
+            type,
+            hp: Math.round(def.hp * hpMult),
+            speed: def.speed * spdMult,
+            armor: def.armor,
+            reward: Math.round(def.reward * rwdMult),
+            delay: i * spawnInterval,
+            isBoss: false,
+        });
+    }
+
+    if (isBoss) {
+        const bDef = ENEMY_DEFS[bossType] || ENEMY_DEFS.normal;
+        const bossHpBase = w === 30 ? 800 : 500;
+        enemies.push({
+            type: bossType,
+            hp: Math.round(bossHpBase * hpMult),
+            speed: 35 * spdMult,
+            armor: 8,
+            reward: 50 + w * 2,
+            delay: count * spawnInterval + 1.5,
+            isBoss: true,
+        });
+    }
+
+    return enemies;
+}
+
+// ===== SECTION 3: PIXEL ART SPRITE DATA =====
+const SPRITES = {
+    creatures: {
+        fire: [
+            // Level 1: Ember (8x8)
+            [
+                '..0440..',
+                '.044340.',
+                '.043240.',
+                '.032120.',
+                '.032240.',
+                '..3223..',
+                '..0330..',
+                '.03..30.',
+            ],
+            // Level 2: Blazer (10x10)
+            [
+                '...0440...',
+                '..044340..',
+                '.0443340..',
+                '.0432240..',
+                '40321240.',
+                '40332240.',
+                '.0432240..',
+                '..043340..',
+                '..003300..',
+                '..03..30..',
+            ],
+            // Level 3: Phoenixar (12x12)
+            [
+                '4...0440...4',
+                '34.044340.43',
+                '.340443403..',
+                '..04322340..',
+                '4.03211230.4',
+                '340321123043',
+                '.403322340..',
+                '..04433440..',
+                '...0433340..',
+                '...0034300..',
+                '..03.00.30..',
+                '.03..00..30.',
+            ],
+        ],
+        water: [
+            [
+                '..0550..',
+                '.055650.',
+                '.056560.',
+                '.065560.',
+                '.056650.',
+                '..5665..',
+                '..0560..',
+                '...00...',
+            ],
+            [
+                '..00550...',
+                '.0556650..',
+                '.0565560..',
+                '.0655650..',
+                '.0566560..',
+                '.0566650..',
+                '..056650..',
+                '..0056500.',
+                '...005500.',
+                '....000...',
+            ],
+            [
+                '...005500...',
+                '..05566500..',
+                '.056556560..',
+                '.065655650..',
+                '.056656560..',
+                '.056566560..',
+                '..05665560..',
+                '..00566550..',
+                '...00565500.',
+                '....005550..',
+                '.....00050..',
+                '......000...',
+            ],
+        ],
+        earth: [
+            [
+                '..0770..',
+                '.077870.',
+                '.078780.',
+                '.077870.',
+                '.078870.',
+                '..7887..',
+                '..0770..',
+                '.07..70.',
+            ],
+            [
+                '..007700..',
+                '.07788700.',
+                '.07878700.',
+                '.07887800.',
+                '.07788700.',
+                '.07887800.',
+                '..0788700.',
+                '..0077800.',
+                '...007700.',
+                '..07...70.',
+            ],
+            [
+                '....0770....',
+                '..07788700..',
+                '.0787878700.',
+                '.0788787800.',
+                '.0778878700.',
+                '90788878009.',
+                '90778878009.',
+                '.0788787800.',
+                '..078887800.',
+                '..007788700.',
+                '...007.700..',
+                '..07....70..',
+            ],
+        ],
+        electric: [
+            [
+                '..0AA0..',
+                '.0AAB0..',
+                '.0ABBA.',
+                '.0AABA0.',
+                '.0ABBA0.',
+                '..ABB0..',
+                '..0AA0..',
+                '.0A..A0.',
+            ],
+            [
+                '...0AAB0..',
+                '..0AABB0..',
+                '.0AABBA0..',
+                '.0ABBA0...',
+                'B0AABBA0..',
+                '.0AABBA0B.',
+                '.0ABBAB0..',
+                '..0AABB0..',
+                '...00AA0..',
+                '..0A..A0..',
+            ],
+            [
+                'B...0AAB...B',
+                '.B.0AABB0.B.',
+                '..0AABBBA0..',
+                '.0AABBBA0...',
+                'B0AABBBA0..B',
+                '.0AABBBAB0..',
+                'B0AABBBA0..B',
+                '.0AABBBA0...',
+                '..0AABBBA0..',
+                '...0AABB0...',
+                '..0A..AA0...',
+                '.0A....A0...',
+            ],
+        ],
+        ice: [
+            [
+                '..0CC0..',
+                '.0CCD0..',
+                '.0CDDC0.',
+                '.0CCDC0.',
+                '.0CDDC0.',
+                '..CDC0..',
+                '..0CC0..',
+                '.0C..C0.',
+            ],
+            [
+                '..00CC0...',
+                '.0CCDD0...',
+                '.0CDDCC0..',
+                '.0CCDDC0..',
+                '.0CDDCC0..',
+                '.0CCDDC0..',
+                '..0CDDC0..',
+                '..00CDC00.',
+                '...00CC00.',
+                '..0C...C0.',
+            ],
+            [
+                'D...0CC0...D',
+                '.D.0CCDD0.D.',
+                '..0CCDDCC0..',
+                '.0CCDDCC0...',
+                'D0CCDDDC0..D',
+                '.0CCDDDCC0..',
+                'D0CCDDDC0..D',
+                '.0CCDDCC0...',
+                '..0CCDDCC0..',
+                '...0CCDD0...',
+                '..0C..CC0...',
+                '.0C....C0...',
+            ],
+        ],
+    },
+    enemies: {
+        normal: [
+            '.0110.',
+            '011210',
+            '012210',
+            '011210',
+            '011110',
+            '.0110.',
+        ],
+        fire: [
+            '.0220.',
+            '022320',
+            '023320',
+            '022320',
+            '022220',
+            '.0220.',
+        ],
+        water: [
+            '.0550.',
+            '055650',
+            '056650',
+            '055650',
+            '055550',
+            '.0550.',
+        ],
+        earth: [
+            '.0770.',
+            '077870',
+            '078870',
+            '077870',
+            '077770',
+            '.0770.',
+        ],
+        electric: [
+            '.0AA0.',
+            '0AABB0',
+            '0ABBA0',
+            '0AABB0',
+            '0AAAA0',
+            '.0AA0.',
+        ],
+        ice: [
+            '.0CC0.',
+            '0CCDD0',
+            '0CDDC0',
+            '0CCDD0',
+            '0CCCC0',
+            '.0CC0.',
+        ],
+    },
+};
+
+const PALETTE = {
+    '0': null, // transparent
+    '.': null,
+    '1': '#66bb6a', '2': '#a5d6a7', '3': '#ff8c42', '4': '#ffd700',
+    '5': '#1e90ff', '6': '#87cefa', '7': '#8B6914', '8': '#c8a84e',
+    '9': '#e0e0e0',
+    'A': '#ffd700', 'B': '#fff44f',
+    'C': '#00CED1', 'D': '#e0ffff',
+};
+
+function drawSprite(ctx, spriteData, x, y, size) {
+    const rows = spriteData.length;
+    const cols = spriteData[0].length;
+    const px = size / Math.max(rows, cols);
+    const offX = x - (cols * px) / 2;
+    const offY = y - (rows * px) / 2;
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const ch = spriteData[r][c];
+            const color = PALETTE[ch];
+            if (color) {
+                ctx.fillStyle = color;
+                ctx.fillRect(Math.floor(offX + c * px), Math.floor(offY + r * px), Math.ceil(px), Math.ceil(px));
+            }
+        }
+    }
+}
+
+function drawSpriteToCanvas(spriteData, size) {
+    const cvs = document.createElement('canvas');
+    cvs.width = size; cvs.height = size;
+    const c = cvs.getContext('2d');
+    drawSprite(c, spriteData, size / 2, size / 2, size);
+    return cvs;
+}
+
+// ===== SECTION 4: ENTITY CLASSES =====
+class Creature {
+    constructor(type, gridX, gridY) {
+        this.type = type;
+        this.gridX = gridX;
+        this.gridY = gridY;
+        const pos = gridToPixel(gridX, gridY);
+        this.x = pos.x;
+        this.y = pos.y;
+        this.level = 0;
+        this.totalInvested = CREATURE_DEFS[type].cost[0];
+        this.cooldown = 0;
+        this.target = null;
+        this.animTimer = 0;
+        this.animFrame = 0;
+        this.attackAnim = 0;
+        this.id = Creature._nextId++;
+    }
+
+    get def() { return CREATURE_DEFS[this.type]; }
+    get damage() { return this.def.damage[this.level]; }
+    get range() { return this.def.range[this.level]; }
+    get atkSpeed() { return this.def.attackSpeed[this.level]; }
+    get special() { return this.def.special[this.level]; }
+    get name() { return this.def.name[this.level]; }
+    get canEvolve() { return this.level < 2; }
+    get evolveCost() { return this.canEvolve ? this.def.cost[this.level + 1] : 0; }
+    get sellValue() { return Math.floor(this.totalInvested * CONFIG.SELL_REFUND); }
+
+    evolve() {
+        if (!this.canEvolve) return;
+        this.totalInvested += this.def.cost[this.level + 1];
+        this.level++;
+    }
+
+    findTarget(enemies) {
+        let best = null, bestProgress = -1;
+        for (const e of enemies) {
+            if (!e.alive) continue;
+            const d = dist(this.x, this.y, e.x, e.y);
+            if (d <= this.range) {
+                const mult = TYPE_EFFECTIVENESS[this.type]?.[e.type] || 1;
+                const score = e.pathProgress + (mult >= 1.5 ? 100 : 0);
+                if (score > bestProgress) {
+                    bestProgress = score;
+                    best = e;
+                }
+            }
+        }
+        return best;
+    }
+
+    update(dt, enemies, projectiles) {
+        this.animTimer += dt;
+        if (this.animTimer > 0.4) { this.animTimer = 0; this.animFrame = 1 - this.animFrame; }
+        if (this.attackAnim > 0) this.attackAnim -= dt * 4;
+        this.cooldown -= dt;
+        if (this.cooldown <= 0) {
+            const target = this.findTarget(enemies);
+            if (target) {
+                this.target = target;
+                this.cooldown = 1 / this.atkSpeed;
+                this.attackAnim = 1;
+                projectiles.push(new Projectile(this.x, this.y, target, this.damage, this.type, this.special));
+            }
+        }
+    }
+
+    draw(ctx) {
+        const spriteData = SPRITES.creatures[this.type]?.[this.level];
+        const s = CONFIG.GRID_SIZE - 4;
+        const scale = 1 + this.attackAnim * 0.15;
+        const bobY = this.animFrame * 2 - 1;
+        ctx.save();
+        ctx.translate(this.x, this.y + bobY);
+        ctx.scale(scale, scale);
+        if (spriteData) {
+            drawSprite(ctx, spriteData, 0, 0, s);
+        } else {
+            ctx.fillStyle = TYPE_COLORS[this.type].primary;
+            ctx.fillRect(-s / 2, -s / 2, s, s);
+        }
+        ctx.restore();
+
+        // Level indicator
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('*'.repeat(this.level + 1), this.x, this.y - CONFIG.GRID_SIZE / 2 + 2);
+    }
+
+    drawRange(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.range, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        ctx.fill();
+    }
+}
+Creature._nextId = 1;
+
+class Enemy {
+    constructor(config, pixelWaypoints) {
+        this.type = config.type;
+        this.maxHp = config.hp;
+        this.hp = config.hp;
+        this.baseSpeed = config.speed;
+        this.speed = config.speed;
+        this.armor = config.armor;
+        this.reward = config.reward;
+        this.isBoss = config.isBoss || false;
+        this.alive = true;
+        this.reachedEnd = false;
+
+        this.waypoints = pixelWaypoints;
+        this.wpIndex = 0;
+        this.x = pixelWaypoints[0].x;
+        this.y = pixelWaypoints[0].y;
+        this.pathProgress = 0;
+
+        this.effects = { slow: 0, slowAmount: 0, burn: 0, burnDps: 0, stun: 0, freeze: 0 };
+        this.animTimer = 0;
+        this.animFrame = 0;
+        this.deathAnim = 0;
+        this.immune = ENEMY_DEFS[this.type]?.immune || null;
+    }
+
+    update(dt) {
+        if (!this.alive) return;
+
+        // Process effects
+        if (this.effects.stun > 0) { this.effects.stun -= dt; }
+        if (this.effects.freeze > 0) { this.effects.freeze -= dt; }
+        if (this.effects.burn > 0) {
+            this.effects.burn -= dt;
+            this.hp -= this.effects.burnDps * dt;
+            if (this.hp <= 0) { this.alive = false; return; }
+        }
+        if (this.effects.slow > 0) { this.effects.slow -= dt; }
+
+        // Movement
+        const isFrozenOrStunned = this.effects.stun > 0 || this.effects.freeze > 0;
+        if (!isFrozenOrStunned) {
+            let currentSpeed = this.baseSpeed;
+            if (this.effects.slow > 0) currentSpeed *= (1 - this.effects.slowAmount);
+            this.speed = currentSpeed;
+
+            const target = this.waypoints[this.wpIndex + 1];
+            if (!target) { this.reachedEnd = true; this.alive = false; return; }
+
+            const dx = target.x - this.x, dy = target.y - this.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            const move = currentSpeed * dt;
+
+            if (move >= d) {
+                this.x = target.x;
+                this.y = target.y;
+                this.wpIndex++;
+                if (this.wpIndex >= this.waypoints.length - 1) {
+                    this.reachedEnd = true;
+                    this.alive = false;
+                }
+            } else {
+                this.x += (dx / d) * move;
+                this.y += (dy / d) * move;
+            }
+            this.pathProgress = this.wpIndex + (d > 0 ? 1 - d / dist(this.waypoints[this.wpIndex].x, this.waypoints[this.wpIndex].y, target.x, target.y) : 0);
+        }
+
+        this.animTimer += dt;
+        if (this.animTimer > 0.3) { this.animTimer = 0; this.animFrame = 1 - this.animFrame; }
+    }
+
+    takeDamage(amount, attackerType) {
+        const mult = TYPE_EFFECTIVENESS[attackerType]?.[this.type] || 1;
+        const dmg = Math.max(1, amount * mult - this.armor);
+        this.hp -= dmg;
+        if (this.hp <= 0) this.alive = false;
+        return { damage: dmg, multiplier: mult };
+    }
+
+    applyEffect(effect) {
+        if (!effect) return;
+        if (effect.type === 'burn' && this.immune !== 'burn') {
+            if (Math.random() < effect.chance) {
+                this.effects.burn = effect.duration;
+                this.effects.burnDps = effect.dps;
+            }
+        }
+        if (effect.type === 'slow' && this.immune !== 'slow') {
+            this.effects.slow = effect.duration;
+            this.effects.slowAmount = effect.amount;
+            if (effect.freeze && this.immune !== 'freeze') {
+                if (Math.random() < effect.freeze.chance) {
+                    this.effects.freeze = effect.freeze.duration;
+                }
+            }
+        }
+        if (effect.type === 'stun' && this.immune !== 'stun') {
+            if (Math.random() < effect.chance) {
+                this.effects.stun = effect.duration;
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (!this.alive) return;
+        const size = this.isBoss ? CONFIG.GRID_SIZE * 1.5 : CONFIG.GRID_SIZE - 8;
+        const bobY = this.animFrame * 2 - 1;
+
+        ctx.save();
+        ctx.translate(this.x, this.y + bobY);
+
+        // Freeze/slow tint
+        if (this.effects.freeze > 0) {
+            ctx.globalAlpha = 0.7;
+        }
+
+        const spriteData = SPRITES.enemies[this.type];
+        if (spriteData) {
+            drawSprite(ctx, spriteData, 0, 0, size);
+        } else {
+            ctx.fillStyle = ENEMY_DEFS[this.type]?.color || '#66bb6a';
+            ctx.fillRect(-size / 2, -size / 2, size, size);
+        }
+
+        ctx.globalAlpha = 1;
+
+        // Frozen overlay
+        if (this.effects.freeze > 0) {
+            ctx.strokeStyle = '#aaf';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(-size / 2 - 2, -size / 2 - 2, size + 4, size + 4);
+        }
+
+        // Slow tint
+        if (this.effects.slow > 0 && this.effects.freeze <= 0) {
+            ctx.fillStyle = 'rgba(30,144,255,0.25)';
+            ctx.fillRect(-size / 2, -size / 2, size, size);
+        }
+
+        // Burn effect
+        if (this.effects.burn > 0) {
+            ctx.fillStyle = 'rgba(255,100,0,0.3)';
+            ctx.fillRect(-size / 2, -size / 2, size, size);
+        }
+
+        // Stun stars
+        if (this.effects.stun > 0) {
+            ctx.fillStyle = '#ffd700';
+            ctx.font = '12px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('***', 0, -size / 2 - 8);
+        }
+
+        ctx.restore();
+
+        // Health bar
+        const barW = size + 4, barH = 4;
+        const barX = this.x - barW / 2, barY = this.y - size / 2 - 8 + bobY;
+        ctx.fillStyle = '#333';
+        ctx.fillRect(barX, barY, barW, barH);
+        const hpRatio = Math.max(0, this.hp / this.maxHp);
+        ctx.fillStyle = hpRatio > 0.5 ? '#4eff4e' : hpRatio > 0.25 ? '#ffd700' : '#ff4444';
+        ctx.fillRect(barX, barY, barW * hpRatio, barH);
+    }
+}
+
+class Projectile {
+    constructor(x, y, target, damage, type, special) {
+        this.x = x;
+        this.y = y;
+        this.target = target;
+        this.damage = damage;
+        this.type = type;
+        this.special = special;
+        this.speed = 300;
+        this.alive = true;
+        this.trail = [];
+    }
+
+    update(dt, enemies, particles, floatingTexts) {
+        if (!this.alive) return;
+
+        if (!this.target || !this.target.alive) {
+            this.alive = false;
+            return;
+        }
+
+        const dx = this.target.x - this.x, dy = this.target.y - this.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const move = this.speed * dt;
+
+        this.trail.push({ x: this.x, y: this.y, life: 0.2 });
+        if (this.trail.length > 6) this.trail.shift();
+
+        if (move >= d) {
+            this.hit(enemies, particles, floatingTexts);
+        } else {
+            this.x += (dx / d) * move;
+            this.y += (dy / d) * move;
+        }
+    }
+
+    hit(enemies, particles, floatingTexts) {
+        this.alive = false;
+        const result = this.target.takeDamage(this.damage, this.type);
+        this.target.applyEffect(this.special);
+
+        // Particles
+        const col = TYPE_COLORS[this.type].primary;
+        for (let i = 0; i < 5; i++) {
+            particles.push(new Particle(this.target.x, this.target.y, col));
+        }
+
+        // Floating text
+        if (result.multiplier >= 2.0) {
+            floatingTexts.push(new FloatingText(this.target.x, this.target.y - 20, 'Super Effective!', '#4eff4e'));
+        } else if (result.multiplier >= 1.5) {
+            floatingTexts.push(new FloatingText(this.target.x, this.target.y - 20, 'Effective!', '#aaff77'));
+        } else if (result.multiplier <= 0.5) {
+            floatingTexts.push(new FloatingText(this.target.x, this.target.y - 20, 'Weak...', '#ff4e4e'));
+        }
+
+        // AoE splash (water lv3)
+        if (this.special?.aoe) {
+            for (const e of enemies) {
+                if (e === this.target || !e.alive) continue;
+                if (dist(this.target.x, this.target.y, e.x, e.y) <= this.special.aoe) {
+                    e.takeDamage(this.damage * 0.5, this.type);
+                    e.applyEffect(this.special);
+                }
+            }
+        }
+
+        // Chain lightning
+        if (this.special?.type === 'chain' && this.special.targets > 0) {
+            let chainFrom = this.target;
+            let chained = new Set([this.target]);
+            for (let c = 0; c < this.special.targets; c++) {
+                let closest = null, closestD = 80;
+                for (const e of enemies) {
+                    if (!e.alive || chained.has(e)) continue;
+                    const d2 = dist(chainFrom.x, chainFrom.y, e.x, e.y);
+                    if (d2 < closestD) { closestD = d2; closest = e; }
+                }
+                if (closest) {
+                    closest.takeDamage(this.damage * this.special.dmgRatio, this.type);
+                    chained.add(closest);
+                    particles.push(new LightningParticle(chainFrom.x, chainFrom.y, closest.x, closest.y));
+                    chainFrom = closest;
+                }
+            }
+        }
+    }
+
+    draw(ctx) {
+        if (!this.alive) return;
+        const col = TYPE_COLORS[this.type];
+
+        // Trail
+        for (let i = 0; i < this.trail.length; i++) {
+            const t = this.trail[i];
+            const alpha = i / this.trail.length * 0.5;
+            ctx.fillStyle = col.primary;
+            ctx.globalAlpha = alpha;
+            ctx.fillRect(t.x - 2, t.y - 2, 4, 4);
+        }
+        ctx.globalAlpha = 1;
+
+        // Projectile
+        ctx.fillStyle = col.light;
+        ctx.fillRect(this.x - 3, this.y - 3, 6, 6);
+        ctx.fillStyle = col.primary;
+        ctx.fillRect(this.x - 2, this.y - 2, 4, 4);
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.vx = randRange(-60, 60);
+        this.vy = randRange(-80, 20);
+        this.color = color;
+        this.life = randRange(0.3, 0.7);
+        this.maxLife = this.life;
+        this.size = randRange(2, 5);
+    }
+
+    update(dt) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.vy += 100 * dt;
+        this.life -= dt;
+    }
+
+    get alive() { return this.life > 0; }
+
+    draw(ctx) {
+        ctx.globalAlpha = this.life / this.maxLife;
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x - this.size / 2, this.y - this.size / 2, this.size, this.size);
+        ctx.globalAlpha = 1;
+    }
+}
+
+class LightningParticle {
+    constructor(x1, y1, x2, y2) {
+        this.x1 = x1; this.y1 = y1;
+        this.x2 = x2; this.y2 = y2;
+        this.life = 0.3;
+    }
+    get alive() { return this.life > 0; }
+    update(dt) { this.life -= dt; }
+    draw(ctx) {
+        ctx.globalAlpha = this.life / 0.3;
+        ctx.strokeStyle = '#fff44f';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(this.x1, this.y1);
+        const midX = (this.x1 + this.x2) / 2 + randRange(-10, 10);
+        const midY = (this.y1 + this.y2) / 2 + randRange(-10, 10);
+        ctx.lineTo(midX, midY);
+        ctx.lineTo(this.x2, this.y2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    }
+}
+
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x; this.y = y;
+        this.text = text; this.color = color;
+        this.life = 1.2;
+    }
+    get alive() { return this.life > 0; }
+    update(dt) { this.life -= dt; this.y -= 30 * dt; }
+    draw(ctx) {
+        ctx.globalAlpha = Math.min(1, this.life);
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 12px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.globalAlpha = 1;
+    }
+}
+
+// ===== SECTION 5: AUDIO SYSTEM =====
+class AudioSystem {
+    constructor() {
+        this.ctx = null;
+        this.muted = false;
+        this.volume = 0.15;
+    }
+
+    init() {
+        try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    }
+
+    play(type) {
+        if (this.muted || !this.ctx) return;
+        try {
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            gain.gain.value = this.volume;
+
+            switch (type) {
+                case 'place':
+                    osc.type = 'square'; osc.frequency.value = 440;
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.linearRampToValueAtTime(660, now + 0.1);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.15);
+                    osc.start(now); osc.stop(now + 0.15);
+                    break;
+                case 'shoot':
+                    osc.type = 'sawtooth'; osc.frequency.value = 800;
+                    gain.gain.value = this.volume * 0.3;
+                    gain.gain.linearRampToValueAtTime(0, now + 0.05);
+                    osc.start(now); osc.stop(now + 0.06);
+                    break;
+                case 'kill':
+                    osc.type = 'square'; osc.frequency.value = 200;
+                    osc.frequency.linearRampToValueAtTime(80, now + 0.15);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                    osc.start(now); osc.stop(now + 0.2);
+                    break;
+                case 'evolve':
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.linearRampToValueAtTime(600, now + 0.15);
+                    osc.frequency.linearRampToValueAtTime(900, now + 0.3);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.35);
+                    osc.start(now); osc.stop(now + 0.35);
+                    break;
+                case 'wave':
+                    osc.type = 'triangle'; osc.frequency.value = 330;
+                    osc.frequency.linearRampToValueAtTime(550, now + 0.2);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.4);
+                    osc.start(now); osc.stop(now + 0.4);
+                    break;
+                case 'hit':
+                    osc.type = 'sawtooth'; osc.frequency.value = 150;
+                    osc.frequency.linearRampToValueAtTime(50, now + 0.1);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                    osc.start(now); osc.stop(now + 0.12);
+                    break;
+                case 'gameover':
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.linearRampToValueAtTime(200, now + 0.3);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.6);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.8);
+                    osc.start(now); osc.stop(now + 0.8);
+                    break;
+                case 'victory':
+                    osc.type = 'sine';
+                    [523, 659, 784, 1047].forEach((f, i) => {
+                        osc.frequency.setValueAtTime(f, now + i * 0.15);
+                    });
+                    gain.gain.linearRampToValueAtTime(0, now + 0.7);
+                    osc.start(now); osc.stop(now + 0.7);
+                    break;
+            }
+        } catch (e) {}
+    }
+}
+
+// ===== SECTION 6: MAIN GAME CLASS =====
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.audio = new AudioSystem();
+
+        this.state = 'title'; // title, playing, paused, gameover, victory
+        this.gold = CONFIG.STARTING_GOLD;
+        this.lives = CONFIG.STARTING_LIVES;
+        this.score = 0;
+        this.waveNum = 0;
+        this.totalEnemiesKilled = 0;
+        this.totalGoldEarned = 0;
+
+        this.pathCells = buildPathCells(MAP_WAYPOINTS);
+        this.pixelWaypoints = buildPixelWaypoints(MAP_WAYPOINTS);
+        this.decorations = [];
+
+        this.creatures = [];
+        this.enemies = [];
+        this.projectiles = [];
+        this.particles = [];
+        this.floatingTexts = [];
+
+        this.waveEnemies = [];
+        this.spawnTimer = 0;
+        this.spawnIndex = 0;
+        this.waveActive = false;
+        this.betweenWaveTimer = CONFIG.BETWEEN_WAVE_TIME;
+
+        this.mouseX = 0;
+        this.mouseY = 0;
+        this.mouseGridX = -1;
+        this.mouseGridY = -1;
+        this.selectedType = null;
+        this.selectedCreature = null;
+        this.hoverCreature = null;
+
+        this.gameSpeed = 1;
+        this.scale = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+
+        this.screenFlash = 0;
+
+        this.resize();
+        this.generateDecorations();
+        this.setupEvents();
+        this.buildUI();
+        this.loop();
+    }
+
+    resize() {
+        const panelW = this.state === 'title' ? 0 : CONFIG.PANEL_W;
+        const availW = window.innerWidth - panelW;
+        const availH = window.innerHeight;
+        const scaleX = availW / CONFIG.LOGICAL_W;
+        const scaleY = availH / CONFIG.LOGICAL_H;
+        this.scale = Math.min(scaleX, scaleY);
+        this.canvas.width = CONFIG.LOGICAL_W * this.scale;
+        this.canvas.height = CONFIG.LOGICAL_H * this.scale;
+        this.canvas.style.width = this.canvas.width + 'px';
+        this.canvas.style.height = this.canvas.height + 'px';
+        this.offsetX = (availW - this.canvas.width) / 2;
+        this.offsetY = (availH - this.canvas.height) / 2;
+        this.canvas.style.marginLeft = Math.max(0, this.offsetX) + 'px';
+        this.canvas.style.marginTop = Math.max(0, this.offsetY) + 'px';
+    }
+
+    generateDecorations() {
+        this.decorations = [];
+        const colors = ['#4a8c3f', '#5a9c4f', '#3a7c2f', '#6aac5f'];
+        for (let i = 0; i < 60; i++) {
+            const gx = randInt(0, CONFIG.COLS - 1);
+            const gy = randInt(0, CONFIG.ROWS - 1);
+            if (this.pathCells.has(`${gx},${gy}`)) continue;
+            const pos = gridToPixel(gx, gy);
+            this.decorations.push({
+                x: pos.x + randRange(-12, 12),
+                y: pos.y + randRange(-12, 12),
+                type: Math.random() < 0.5 ? 'flower' : 'rock',
+                color: colors[randInt(0, colors.length - 1)],
+                size: randRange(3, 7),
+            });
+        }
+    }
+
+    setupEvents() {
+        this.canvas.addEventListener('mousemove', (e) => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.mouseX = (e.clientX - rect.left) / this.scale;
+            this.mouseY = (e.clientY - rect.top) / this.scale;
+            const g = pixelToGrid(this.mouseX, this.mouseY);
+            this.mouseGridX = g.x;
+            this.mouseGridY = g.y;
+
+            this.hoverCreature = this.creatures.find(c => c.gridX === g.x && c.gridY === g.y) || null;
+        });
+
+        this.canvas.addEventListener('click', (e) => {
+            if (this.state !== 'playing') return;
+            const g = pixelToGrid(this.mouseX, this.mouseY);
+
+            if (this.selectedType) {
+                this.placeCreature(this.selectedType, g.x, g.y);
+            } else {
+                const clicked = this.creatures.find(c => c.gridX === g.x && c.gridY === g.y);
+                if (clicked) {
+                    this.selectedCreature = clicked === this.selectedCreature ? null : clicked;
+                    this.selectedType = null;
+                } else {
+                    this.selectedCreature = null;
+                }
+                this.updateInfoPanel();
+            }
+        });
+
+        this.canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            this.selectedType = null;
+            this.selectedCreature = null;
+            this.updateCreatureButtons();
+            this.updateInfoPanel();
+        });
+
+        window.addEventListener('resize', () => this.resize());
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (this.state === 'playing') this.togglePause();
+                else if (this.state === 'paused') this.togglePause();
+                this.selectedType = null;
+                this.selectedCreature = null;
+                this.updateCreatureButtons();
+                this.updateInfoPanel();
+            }
+            if (e.key === 'g' || e.key === 'G') this.showGrid = !this.showGrid;
+        });
+    }
+
+    buildUI() {
+        const container = document.getElementById('creature-buttons');
+        container.innerHTML = '';
+        for (const type of ['fire', 'water', 'earth', 'electric', 'ice']) {
+            const def = CREATURE_DEFS[type];
+            const btn = document.createElement('button');
+            btn.className = 'creature-btn';
+            btn.dataset.type = type;
+
+            const preview = drawSpriteToCanvas(SPRITES.creatures[type][0], 28);
+            btn.appendChild(preview);
+
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = def.name[0];
+            btn.appendChild(nameSpan);
+
+            const costSpan = document.createElement('span');
+            costSpan.className = 'creature-cost';
+            costSpan.textContent = def.cost[0] + 'g';
+            btn.appendChild(costSpan);
+
+            btn.addEventListener('click', () => {
+                if (this.gold < def.cost[0]) return;
+                this.selectedType = type === this.selectedType ? null : type;
+                this.selectedCreature = null;
+                this.updateCreatureButtons();
+                this.updateInfoPanel();
+            });
+
+            container.appendChild(btn);
+        }
+    }
+
+    updateCreatureButtons() {
+        document.querySelectorAll('.creature-btn').forEach(btn => {
+            const type = btn.dataset.type;
+            const cost = CREATURE_DEFS[type].cost[0];
+            btn.classList.toggle('selected', type === this.selectedType);
+            btn.classList.toggle('disabled', this.gold < cost);
+        });
+    }
+
+    updateInfoPanel() {
+        const panel = document.getElementById('info-panel');
+        const content = document.getElementById('info-content');
+        if (!this.selectedCreature) {
+            panel.style.display = 'none';
+            return;
+        }
+        panel.style.display = 'block';
+        const c = this.selectedCreature;
+        const typeBadge = `<span class="type-badge type-${c.type}">${c.type.toUpperCase()}</span>`;
+        let html = `
+            <div style="font-weight:bold;font-size:14px;margin-bottom:4px;">${c.name} ${typeBadge}</div>
+            <div class="info-row"><span class="info-label">Level</span><span class="info-value">${c.level + 1}/3</span></div>
+            <div class="info-row"><span class="info-label">Damage</span><span class="info-value">${c.damage}</span></div>
+            <div class="info-row"><span class="info-label">Range</span><span class="info-value">${c.range}</span></div>
+            <div class="info-row"><span class="info-label">Atk/s</span><span class="info-value">${c.atkSpeed.toFixed(1)}</span></div>
+        `;
+
+        if (c.special) {
+            let specText = '';
+            if (c.special.type === 'burn') specText = `Burn: ${c.special.dps} dps (${Math.round(c.special.chance * 100)}%)`;
+            if (c.special.type === 'slow') specText = `Slow: ${Math.round(c.special.amount * 100)}% for ${c.special.duration}s`;
+            if (c.special.type === 'stun') specText = `Stun: ${c.special.duration}s (${Math.round(c.special.chance * 100)}%)`;
+            if (c.special.type === 'chain') specText = `Chain: ${c.special.targets} targets`;
+            if (c.special.aoe) specText += ` + AoE`;
+            if (c.special.freeze) specText += ` + Freeze`;
+            html += `<div class="info-row"><span class="info-label">Special</span><span class="info-value" style="font-size:10px;">${specText}</span></div>`;
+        }
+
+        // Type effectiveness hints
+        html += '<div style="margin-top:6px;font-size:10px;color:#888;">Strong vs:</div><div style="font-size:10px;">';
+        const effs = TYPE_EFFECTIVENESS[c.type];
+        for (const [t, m] of Object.entries(effs)) {
+            if (m >= 1.5) html += `<span class="type-badge type-${t}" style="margin:1px;font-size:9px;">${t} ${m}x</span>`;
+        }
+        html += '</div><div style="margin-top:2px;font-size:10px;color:#888;">Weak vs:</div><div style="font-size:10px;">';
+        for (const [t, m] of Object.entries(effs)) {
+            if (m <= 0.5) html += `<span class="type-badge type-${t}" style="margin:1px;font-size:9px;">${t} ${m}x</span>`;
+        }
+        html += '</div>';
+
+        if (c.canEvolve) {
+            const eCost = c.evolveCost;
+            const canAfford = this.gold >= eCost;
+            html += `<button class="action-btn evolve ${canAfford ? '' : 'disabled'}" onclick="game.evolveCreature()">Evolve (${eCost}g)</button>`;
+        }
+        html += `<button class="action-btn sell" onclick="game.sellCreature()">Sell (${c.sellValue}g)</button>`;
+
+        content.innerHTML = html;
+    }
+
+    updateWavePanel() {
+        const panel = document.getElementById('wave-panel');
+        if (this.waveActive) {
+            const remaining = this.enemies.filter(e => e.alive).length + (this.waveEnemies.length - this.spawnIndex);
+            panel.innerHTML = `<div class="wave-info">Wave ${this.waveNum}/${CONFIG.TOTAL_WAVES}</div>
+                <div class="wave-info" style="font-size:11px;">Enemies: ${remaining}</div>`;
+        } else if (this.waveNum === 0) {
+            panel.innerHTML = `<div class="wave-info" style="color:#4eff4e;">Place your creatures!</div>
+                <div class="wave-info" style="font-size:11px;color:#aaa;">Click a creature above, then click the map to place it near the path.</div>
+                <button class="action-btn wave" onclick="game.sendWave()">Start Wave 1!</button>`;
+        } else if (this.waveNum < CONFIG.TOTAL_WAVES) {
+            panel.innerHTML = `<div class="wave-info">Next: Wave ${this.waveNum + 1}</div>
+                <div class="wave-info" style="font-size:20px;color:#ffd700;">${Math.ceil(this.betweenWaveTimer)}s</div>
+                <button class="action-btn wave" onclick="game.sendWave()">Send Wave!</button>`;
+        } else {
+            panel.innerHTML = `<div class="wave-info">All waves complete!</div>`;
+        }
+    }
+
+    placeCreature(type, gx, gy) {
+        if (gx < 0 || gx >= CONFIG.COLS || gy < 0 || gy >= CONFIG.ROWS) return;
+        if (this.pathCells.has(`${gx},${gy}`)) return;
+        if (this.creatures.some(c => c.gridX === gx && c.gridY === gy)) return;
+        const cost = CREATURE_DEFS[type].cost[0];
+        if (this.gold < cost) return;
+
+        this.gold -= cost;
+        const creature = new Creature(type, gx, gy);
+        this.creatures.push(creature);
+        this.selectedType = null;
+
+        // Placement particles
+        const pos = gridToPixel(gx, gy);
+        for (let i = 0; i < 10; i++) {
+            this.particles.push(new Particle(pos.x, pos.y, TYPE_COLORS[type].light));
+        }
+
+        this.audio.play('place');
+        this.updateCreatureButtons();
+        this.updateInfoPanel();
+    }
+
+    evolveCreature() {
+        if (!this.selectedCreature || !this.selectedCreature.canEvolve) return;
+        const cost = this.selectedCreature.evolveCost;
+        if (this.gold < cost) return;
+        this.gold -= cost;
+        this.selectedCreature.evolve();
+
+        for (let i = 0; i < 15; i++) {
+            this.particles.push(new Particle(this.selectedCreature.x, this.selectedCreature.y, '#fff'));
+        }
+
+        this.audio.play('evolve');
+        this.updateCreatureButtons();
+        this.updateInfoPanel();
+    }
+
+    sellCreature() {
+        if (!this.selectedCreature) return;
+        const refund = this.selectedCreature.sellValue;
+        this.gold += refund;
+        this.creatures = this.creatures.filter(c => c !== this.selectedCreature);
+        this.floatingTexts.push(new FloatingText(this.selectedCreature.x, this.selectedCreature.y, `+${refund}g`, '#ffd700'));
+        this.selectedCreature = null;
+        this.updateCreatureButtons();
+        this.updateInfoPanel();
+    }
+
+    sendWave() {
+        if (this.waveActive || this.waveNum >= CONFIG.TOTAL_WAVES) return;
+        this.waveNum++;
+        this.waveEnemies = getWaveEnemies(this.waveNum);
+        this.spawnIndex = 0;
+        this.spawnTimer = 0;
+        this.waveActive = true;
+        this.audio.play('wave');
+    }
+
+    toggleSpeed() {
+        this.gameSpeed = this.gameSpeed === 1 ? 2 : 1;
+        document.getElementById('speed-btn').textContent = `Speed: ${this.gameSpeed}x`;
+    }
+
+    togglePause() {
+        if (this.state === 'playing') {
+            this.state = 'paused';
+            document.getElementById('pause-overlay').classList.remove('overlay-hidden');
+        } else if (this.state === 'paused') {
+            this.state = 'playing';
+            document.getElementById('pause-overlay').classList.add('overlay-hidden');
+        }
+    }
+
+    startGame() {
+        this.state = 'playing';
+        this.audio.init();
+        document.getElementById('title-overlay').classList.add('overlay-hidden');
+        document.getElementById('ui-panel').classList.remove('hidden');
+        this.resize();
+        this.betweenWaveTimer = 5;
+    }
+
+    restartGame() {
+        this.gold = CONFIG.STARTING_GOLD;
+        this.lives = CONFIG.STARTING_LIVES;
+        this.score = 0;
+        this.waveNum = 0;
+        this.totalEnemiesKilled = 0;
+        this.totalGoldEarned = 0;
+        this.creatures = [];
+        this.enemies = [];
+        this.projectiles = [];
+        this.particles = [];
+        this.floatingTexts = [];
+        this.waveEnemies = [];
+        this.waveActive = false;
+        this.betweenWaveTimer = 5;
+        this.spawnIndex = 0;
+        this.spawnTimer = 0;
+        this.selectedType = null;
+        this.selectedCreature = null;
+        this.gameSpeed = 1;
+        this.screenFlash = 0;
+        document.getElementById('speed-btn').textContent = 'Speed: 1x';
+        document.getElementById('gameover-overlay').classList.add('overlay-hidden');
+        document.getElementById('victory-overlay').classList.add('overlay-hidden');
+        document.getElementById('pause-overlay').classList.add('overlay-hidden');
+        document.getElementById('title-overlay').classList.add('overlay-hidden');
+        document.getElementById('ui-panel').classList.remove('hidden');
+        this.state = 'playing';
+        this.resize();
+        this.generateDecorations();
+        this.updateCreatureButtons();
+        this.updateInfoPanel();
+    }
+
+    update(dt) {
+        if (this.state !== 'playing') return;
+
+        dt *= this.gameSpeed;
+        if (this.screenFlash > 0) this.screenFlash -= dt * 2;
+
+        // Wave spawning
+        if (this.waveActive) {
+            this.spawnTimer += dt;
+            while (this.spawnIndex < this.waveEnemies.length) {
+                const eDef = this.waveEnemies[this.spawnIndex];
+                if (this.spawnTimer >= eDef.delay) {
+                    this.enemies.push(new Enemy(eDef, this.pixelWaypoints));
+                    this.spawnIndex++;
+                } else break;
+            }
+
+            // Check wave complete
+            if (this.spawnIndex >= this.waveEnemies.length && this.enemies.every(e => !e.alive)) {
+                this.waveActive = false;
+                this.betweenWaveTimer = CONFIG.BETWEEN_WAVE_TIME;
+                const bonus = 10 + this.waveNum * 5;
+                this.gold += bonus;
+                this.totalGoldEarned += bonus;
+                this.floatingTexts.push(new FloatingText(CONFIG.LOGICAL_W / 2, 60, `Wave ${this.waveNum} Complete! +${bonus}g`, '#ffd700'));
+
+                if (this.waveNum >= CONFIG.TOTAL_WAVES) {
+                    this.state = 'victory';
+                    this.audio.play('victory');
+                    document.getElementById('victory-stats').innerHTML = `
+                        Waves survived: <span>${this.waveNum}</span><br>
+                        Enemies defeated: <span>${this.totalEnemiesKilled}</span><br>
+                        Gold earned: <span>${this.totalGoldEarned}</span><br>
+                        Creatures placed: <span>${this.creatures.length}</span>
+                    `;
+                    document.getElementById('victory-overlay').classList.remove('overlay-hidden');
+                }
+            }
+        } else {
+            // Between waves countdown (auto-start after timer, except before wave 1)
+            if (this.waveNum > 0 && this.waveNum < CONFIG.TOTAL_WAVES) {
+                this.betweenWaveTimer -= dt;
+                if (this.betweenWaveTimer <= 0) this.sendWave();
+            }
+        }
+
+        // Update creatures
+        for (const c of this.creatures) {
+            c.update(dt, this.enemies, this.projectiles);
+        }
+
+        // Update enemies
+        for (const e of this.enemies) {
+            const wasAlive = e.alive;
+            e.update(dt);
+            if (wasAlive && !e.alive) {
+                e._deathHandled = true;
+                if (e.reachedEnd) {
+                    this.lives -= e.isBoss ? 5 : 1;
+                    this.screenFlash = 1;
+                    this.audio.play('hit');
+                    if (this.lives <= 0) {
+                        this.lives = 0;
+                        this.state = 'gameover';
+                        this.audio.play('gameover');
+                        document.getElementById('gameover-stats').innerHTML = `
+                            Waves survived: <span>${this.waveNum}</span><br>
+                            Enemies defeated: <span>${this.totalEnemiesKilled}</span><br>
+                            Gold earned: <span>${this.totalGoldEarned}</span>
+                        `;
+                        document.getElementById('gameover-overlay').classList.remove('overlay-hidden');
+                    }
+                } else {
+                    // Killed by player (burn/DOT)
+                    this.score += e.reward;
+                    this.gold += e.reward;
+                    this.totalGoldEarned += e.reward;
+                    this.totalEnemiesKilled++;
+                    this.floatingTexts.push(new FloatingText(e.x, e.y - 15, `+${e.reward}g`, '#ffd700'));
+                    for (let i = 0; i < 8; i++) {
+                        this.particles.push(new Particle(e.x, e.y, ENEMY_DEFS[e.type]?.color || '#66bb6a'));
+                    }
+                    this.audio.play('kill');
+                }
+            }
+        }
+
+        // Update projectiles
+        for (const p of this.projectiles) {
+            p.update(dt, this.enemies, this.particles, this.floatingTexts);
+        }
+
+        // Check for enemies killed by projectiles (second pass)
+        for (const e of this.enemies) {
+            if (!e.alive && !e._deathHandled) {
+                if (!e.reachedEnd) {
+                    this.score += e.reward;
+                    this.gold += e.reward;
+                    this.totalGoldEarned += e.reward;
+                    this.totalEnemiesKilled++;
+                    this.floatingTexts.push(new FloatingText(e.x, e.y - 15, `+${e.reward}g`, '#ffd700'));
+                    for (let i = 0; i < 8; i++) {
+                        this.particles.push(new Particle(e.x, e.y, ENEMY_DEFS[e.type]?.color || '#66bb6a'));
+                    }
+                    this.audio.play('kill');
+                }
+                e._deathHandled = true;
+            }
+        }
+
+        // Update particles and floating texts
+        for (const p of this.particles) p.update(dt);
+        for (const f of this.floatingTexts) f.update(dt);
+
+        // Cleanup dead entities
+        this.enemies = this.enemies.filter(e => e.alive);
+        this.projectiles = this.projectiles.filter(p => p.alive);
+        this.particles = this.particles.filter(p => p.alive);
+        this.floatingTexts = this.floatingTexts.filter(f => f.alive);
+
+        // Trail cleanup
+        for (const p of this.projectiles) {
+            p.trail = p.trail.filter(t => { t.life -= dt; return t.life > 0; });
+        }
+
+        // Update UI
+        this.updateCreatureButtons();
+        if (this.selectedCreature) this.updateInfoPanel();
+        this.updateWavePanel();
+    }
+
+    draw() {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.scale(this.scale, this.scale);
+
+        // Background
+        ctx.fillStyle = '#2d5a1e';
+        ctx.fillRect(0, 0, CONFIG.LOGICAL_W, CONFIG.LOGICAL_H);
+
+        // Grass texture variation
+        for (let gx = 0; gx < CONFIG.COLS; gx++) {
+            for (let gy = 0; gy < CONFIG.ROWS; gy++) {
+                if (!this.pathCells.has(`${gx},${gy}`)) {
+                    const shade = ((gx + gy) % 2 === 0) ? '#2d5a1e' : '#306320';
+                    ctx.fillStyle = shade;
+                    ctx.fillRect(gx * CONFIG.GRID_SIZE, gy * CONFIG.GRID_SIZE, CONFIG.GRID_SIZE, CONFIG.GRID_SIZE);
+                }
+            }
+        }
+
+        // Path
+        for (const cell of this.pathCells) {
+            const [gx, gy] = cell.split(',').map(Number);
+            if (gx < 0 || gx >= CONFIG.COLS) continue;
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(gx * CONFIG.GRID_SIZE, gy * CONFIG.GRID_SIZE, CONFIG.GRID_SIZE, CONFIG.GRID_SIZE);
+            ctx.fillStyle = '#9C8565';
+            ctx.fillRect(gx * CONFIG.GRID_SIZE + 4, gy * CONFIG.GRID_SIZE + 4, CONFIG.GRID_SIZE - 8, CONFIG.GRID_SIZE - 8);
+        }
+
+        // Entry / Exit markers
+        const entry = gridToPixel(0, 1);
+        const exit = gridToPixel(24, 14);
+        ctx.fillStyle = '#4eff4e';
+        ctx.font = 'bold 16px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('>>>', entry.x - 10, entry.y + 5);
+        ctx.fillStyle = '#ff4444';
+        ctx.fillText('>>>', exit.x + 15, exit.y + 5);
+
+        // Decorations
+        for (const d of this.decorations) {
+            if (d.type === 'flower') {
+                ctx.fillStyle = d.color;
+                ctx.fillRect(d.x - d.size / 2, d.y - d.size / 2, d.size, d.size);
+                ctx.fillStyle = '#ff6b9d';
+                ctx.fillRect(d.x - 1, d.y - 1, 3, 3);
+            } else {
+                ctx.fillStyle = '#777';
+                ctx.fillRect(d.x - d.size / 2, d.y - d.size / 3, d.size, d.size * 0.6);
+            }
+        }
+
+        // Grid overlay
+        if (this.showGrid) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x <= CONFIG.COLS; x++) {
+                ctx.beginPath();
+                ctx.moveTo(x * CONFIG.GRID_SIZE, 0);
+                ctx.lineTo(x * CONFIG.GRID_SIZE, CONFIG.LOGICAL_H);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= CONFIG.ROWS; y++) {
+                ctx.beginPath();
+                ctx.moveTo(0, y * CONFIG.GRID_SIZE);
+                ctx.lineTo(CONFIG.LOGICAL_W, y * CONFIG.GRID_SIZE);
+                ctx.stroke();
+            }
+        }
+
+        // Hover/selected creature range
+        if (this.selectedCreature) {
+            this.selectedCreature.drawRange(ctx);
+        } else if (this.hoverCreature && !this.selectedType) {
+            this.hoverCreature.drawRange(ctx);
+        }
+
+        // Placement preview
+        if (this.selectedType && this.state === 'playing') {
+            const gx = this.mouseGridX, gy = this.mouseGridY;
+            if (gx >= 0 && gx < CONFIG.COLS && gy >= 0 && gy < CONFIG.ROWS) {
+                const onPath = this.pathCells.has(`${gx},${gy}`);
+                const occupied = this.creatures.some(c => c.gridX === gx && c.gridY === gy);
+                const valid = !onPath && !occupied && this.gold >= CREATURE_DEFS[this.selectedType].cost[0];
+
+                const pos = gridToPixel(gx, gy);
+                ctx.globalAlpha = 0.5;
+                ctx.fillStyle = valid ? 'rgba(78, 255, 78, 0.3)' : 'rgba(255, 78, 78, 0.3)';
+                ctx.fillRect(gx * CONFIG.GRID_SIZE, gy * CONFIG.GRID_SIZE, CONFIG.GRID_SIZE, CONFIG.GRID_SIZE);
+
+                const spriteData = SPRITES.creatures[this.selectedType]?.[0];
+                if (spriteData) drawSprite(ctx, spriteData, pos.x, pos.y, CONFIG.GRID_SIZE - 4);
+
+                // Range preview
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, CREATURE_DEFS[this.selectedType].range[0], 0, Math.PI * 2);
+                ctx.strokeStyle = valid ? 'rgba(78,255,78,0.4)' : 'rgba(255,78,78,0.4)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // Creatures
+        for (const c of this.creatures) c.draw(ctx);
+
+        // Enemies
+        for (const e of this.enemies) e.draw(ctx);
+
+        // Projectiles
+        for (const p of this.projectiles) p.draw(ctx);
+
+        // Particles
+        for (const p of this.particles) p.draw(ctx);
+
+        // Floating texts
+        for (const f of this.floatingTexts) f.draw(ctx);
+
+        // HUD Bar
+        ctx.fillStyle = 'rgba(10, 10, 30, 0.8)';
+        ctx.fillRect(0, 0, CONFIG.LOGICAL_W, 30);
+        ctx.font = 'bold 14px Courier New';
+        ctx.textAlign = 'left';
+
+        // Lives
+        ctx.fillStyle = '#ff4444';
+        ctx.fillText('\u2665', 10, 20);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`${this.lives}`, 28, 20);
+
+        // Gold
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText('\u25C6', 80, 20);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`${this.gold}`, 98, 20);
+
+        // Wave
+        ctx.fillStyle = '#aaa';
+        ctx.fillText(`Wave: ${this.waveNum}/${CONFIG.TOTAL_WAVES}`, 200, 20);
+
+        // Score
+        ctx.fillText(`Score: ${this.score}`, 370, 20);
+
+        // Speed indicator
+        if (this.gameSpeed > 1) {
+            ctx.fillStyle = '#00bfff';
+            ctx.fillText(`${this.gameSpeed}x`, 500, 20);
+        }
+
+        // Screen flash (damage taken)
+        if (this.screenFlash > 0) {
+            ctx.fillStyle = `rgba(255, 0, 0, ${this.screenFlash * 0.3})`;
+            ctx.fillRect(0, 0, CONFIG.LOGICAL_W, CONFIG.LOGICAL_H);
+        }
+
+        ctx.restore();
+    }
+
+    loop() {
+        let lastTime = performance.now();
+        const tick = (now) => {
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            this.update(dt);
+            this.draw();
+
+            requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    }
+}
+
+// ===== SECTION 7: INITIALIZATION =====
+const game = new Game();
+
+// Debug tools
+window.DEBUG = {
+    get game() { return game; },
+    addGold(n) { game.gold += n; },
+    setLives(n) { game.lives = n; },
+    skipToWave(n) { game.waveNum = n - 1; game.waveActive = false; game.enemies = []; game.betweenWaveTimer = 1; },
+    spawnEnemy(type) {
+        game.enemies.push(new Enemy({ type, hp: ENEMY_DEFS[type].hp, speed: ENEMY_DEFS[type].speed, armor: ENEMY_DEFS[type].armor, reward: ENEMY_DEFS[type].reward, isBoss: false }, game.pixelWaypoints));
+    },
+    killAll() { game.enemies.forEach(e => { e.hp = 0; e.alive = false; }); },
+    godMode: false,
+};
+</script>
+</body>
+</html>
