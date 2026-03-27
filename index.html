@@ -1468,21 +1468,32 @@ class Game {
 
     updateWavePanel() {
         const panel = document.getElementById('wave-panel');
+        // Determine current state key to avoid re-rendering unchanged content
+        let stateKey;
         if (this.waveActive) {
             const remaining = this.enemies.filter(e => e.alive).length + (this.waveEnemies.length - this.spawnIndex);
+            stateKey = `active-${this.waveNum}-${remaining}`;
+            if (this._wavePanelState === stateKey) return;
             panel.innerHTML = `<div class="wave-info">Wave ${this.waveNum}/${CONFIG.TOTAL_WAVES}</div>
                 <div class="wave-info" style="font-size:11px;">Enemies: ${remaining}</div>`;
         } else if (this.waveNum === 0) {
+            stateKey = 'pre-wave';
+            if (this._wavePanelState === stateKey) return;
             panel.innerHTML = `<div class="wave-info" style="color:#4eff4e;">Place your creatures!</div>
                 <div class="wave-info" style="font-size:11px;color:#aaa;">Click a creature above, then click the map to place it near the path.</div>
                 <button class="action-btn wave" onclick="game.sendWave()">Start Wave 1!</button>`;
         } else if (this.waveNum < CONFIG.TOTAL_WAVES) {
+            stateKey = `between-${this.waveNum}-${Math.ceil(this.betweenWaveTimer)}`;
+            if (this._wavePanelState === stateKey) return;
             panel.innerHTML = `<div class="wave-info">Next: Wave ${this.waveNum + 1}</div>
                 <div class="wave-info" style="font-size:20px;color:#ffd700;">${Math.ceil(this.betweenWaveTimer)}s</div>
                 <button class="action-btn wave" onclick="game.sendWave()">Send Wave!</button>`;
         } else {
+            stateKey = 'complete';
+            if (this._wavePanelState === stateKey) return;
             panel.innerHTML = `<div class="wave-info">All waves complete!</div>`;
         }
+        this._wavePanelState = stateKey;
     }
 
     placeCreature(type, gx, gy) {
